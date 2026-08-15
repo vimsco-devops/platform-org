@@ -1,0 +1,46 @@
+# platform-org/.github/workflows/reusable-ci.yml
+#
+# v1 — deliberately minimal. Build, lint, test. This is the first thing a
+# service repo calls; guardrails (SAST, secret scanning, dependency review,
+# container scan, policy-as-code) get layered on in the next iteration once
+# this baseline is proven green end to end. Service repos never write their
+# own build logic — they call this by reference.
+
+name: reusable-ci
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: "20.x"
+      working-directory:
+        type: string
+        default: "."
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
