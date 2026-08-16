@@ -1,0 +1,57 @@
+# platform-org/.github/workflows/new-service-request.yml
+#
+# IssueOps automation: turns a "New Microservice Request" issue into a real,
+# ready-to-use repo generated from service-template. Triggered by the
+# new-service-request label set on the Issue Form itself.
+
+name: New Service Request
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  provision:
+    if: contains(github.event.issue.labels.*.name, 'new-service-request')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse issue form
+        id: issue-parser
+        uses: stefanbuck/github-issue-parser@v3
+        with:
+          template-path: .github/ISSUE_TEMPLATE/new-microservice.yml
+
+      - name: Generate GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.PLATFORM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          owner: vimsco-devops
+
+      - name: Create repo from template
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SERVICE_NAME: ${{ steps.issue-parser.outputs.issueparser_service_name }}
+          DESCRIPTION: ${{ steps.issue-parser.outputs.issueparser_description }}
+        run: |
+          gh repo create "vimsco-devops/${SERVICE_NAME}" \
+            --template vimsco-devops/service-template \
+            --public \
+            --description "${DESCRIPTION}"
+
+      - name: Comment back on the issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const serviceName = "${{ steps.issue-parser.outputs.issueparser_service_name }}";
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Your service repo is ready: https://github.com/vimsco-devops/${serviceName}`
+            });
+
