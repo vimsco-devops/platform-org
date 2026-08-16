@@ -38,7 +38,7 @@ jobs:
       - name: SAST scan (Semgrep)
         run: |
           docker run --rm -v "${{ github.workspace }}:/src" -w /src semgrep/semgrep \
-            scan --config p/ci --error
+            semgrep scan --config p/ci --error
 
       - uses: actions/setup-node@v5
         with:
