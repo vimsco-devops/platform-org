@@ -35,6 +35,11 @@ jobs:
           docker run --rm -v "${{ github.workspace }}:/repo" zricethezav/gitleaks:latest \
             detect --source /repo --verbose --redact --exit-code 1
 
+      - name: SAST scan (Semgrep)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" -w /src semgrep/semgrep \
+            scan --config p/ci --error
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ inputs.node-version }}
