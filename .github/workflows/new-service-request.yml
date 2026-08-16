@@ -18,6 +18,9 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'new-service-request')
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Parse issue form
         id: issue-parser
         uses: stefanbuck/github-issue-parser@v3
