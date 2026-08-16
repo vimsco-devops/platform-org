@@ -1,11 +1,4 @@
 # platform-org/.github/workflows/reusable-ci.yml
-#
-# v1 — deliberately minimal. Build, lint, test. This is the first thing a
-# service repo calls; guardrails (SAST, secret scanning, dependency review,
-# container scan, policy-as-code) get layered on in the next iteration once
-# this baseline is proven green end to end. Service repos never write their
-# own build logic — they call this by reference.
-
 name: reusable-ci
 
 on:
@@ -22,7 +15,13 @@ permissions:
   contents: read
 
 jobs:
+  guardrails:
+    uses: ./.github/workflows/reusable-guardrails.yml
+    with:
+      working-directory: ${{ inputs.working-directory }}
+
   build-test:
+    needs: guardrails
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,37 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Secret scan
-        run: |
-          docker run --rm -v "${{ github.workspace }}:/repo" zricethezav/gitleaks:latest \
-            detect --source /repo --verbose --redact --exit-code 1
-
-      - name: SAST scan (Semgrep)
-        run: |
-          docker run --rm -v "${{ github.workspace }}:/src" -w /src semgrep/semgrep \
-            semgrep scan --config p/ci --error
-
-      - name: Dependency vulnerability scan (OSV-Scanner)
-        run: |
-          docker run --rm -v "${{ github.workspace }}:/src" ghcr.io/google/osv-scanner \
-            -r /src
-
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
           cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
-
-      - name: Checkout platform policies
-        uses: actions/checkout@v5
-        with:
-          repository: vimsco-devops/platform-org
-          path: .platform-policies
-
-      - name: Policy-as-code (non-root Dockerfile)
-        run: |
-          docker run --rm -v "${{ github.workspace }}:/project" -w /project openpolicyagent/conftest \
-            test --policy .platform-policies/policy ${{ inputs.working-directory }}/Dockerfile
 
       - name: Install
         run: npm ci
@@ -70,3 +43,4 @@ jobs:
 
       - name: Test
         run: npm test
+

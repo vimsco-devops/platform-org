@@ -1,0 +1,51 @@
+# platform-org/.github/workflows/reusable-guardrails.yml
+#
+# Language-agnostic guardrail checks: secret scanning, SAST, dependency
+# scanning, policy-as-code. Called by each language-specific CI pipeline so
+# every golden path inherits the same security baseline without duplicating
+# it per language.
+
+name: reusable-guardrails
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        default: "."
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Checkout platform policies
+        uses: actions/checkout@v5
+        with:
+          repository: vimsco-devops/platform-org
+          path: .platform-policies
+
+      - name: Secret scan
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" zricethezav/gitleaks:latest \
+            detect --source /repo --verbose --redact --exit-code 1
+
+      - name: SAST scan (Semgrep)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" -w /src semgrep/semgrep \
+            semgrep scan --config p/ci --error
+
+      - name: Dependency vulnerability scan (OSV-Scanner)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" ghcr.io/google/osv-scanner \
+            -r /src
+
+      - name: Policy-as-code (Dockerfile checks)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/project" -w /project openpolicyagent/conftest \
+            test --policy .platform-policies/policy ${{ inputs.working-directory }}/Dockerfile
+
