@@ -51,6 +51,17 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
 
+      - name: Checkout platform policies
+        uses: actions/checkout@v5
+        with:
+          repository: vimsco-devops/platform-org
+          path: .platform-policies
+
+      - name: Policy-as-code (non-root Dockerfile)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/project" -w /project openpolicyagent/conftest \
+            test --policy .platform-policies/policy ${{ inputs.working-directory }}/Dockerfile
+
       - name: Install
         run: npm ci
 
