@@ -1,21 +1,29 @@
 # platform-org/.github/workflows/new-service-request.yml
 #
 # IssueOps automation: turns a "New Microservice Request" issue into a real,
-# ready-to-use repo generated from service-template. Triggered by the
-# new-service-request label set on the Issue Form itself.
+# ready-to-use repo generated from service-template. Triggered either by the
+# initial labeled issue, or by a "/retry" comment on that same issue if the
+# first attempt failed partway.
 
 name: New Service Request
 
 on:
   issues:
     types: [opened]
+  issue_comment:
+    types: [created]
 
 permissions:
   issues: write
 
 jobs:
   provision:
-    if: contains(github.event.issue.labels.*.name, 'new-service-request')
+    if: >
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'new-service-request')) ||
+      (github.event_name == 'issue_comment' &&
+       startsWith(github.event.comment.body, '/retry') &&
+       contains(github.event.issue.labels.*.name, 'new-service-request') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,8 +35,21 @@ jobs:
         with:
           template-path: .github/ISSUE_TEMPLATE/new-microservice.yml
 
+      - name: Check if repo already exists
+        id: check-existing
+        env:
+          SERVICE_NAME: ${{ steps.issue-parser.outputs.issueparser_service_name }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "https://api.github.com/repos/vimsco-devops/${SERVICE_NAME}")
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate GitHub App installation token
         id: app-token
+        if: steps.check-existing.outputs.exists == 'false'
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ vars.PLATFORM_APP_CLIENT_ID }}
@@ -36,6 +57,7 @@ jobs:
           owner: vimsco-devops
 
       - name: Create repo from template
+        if: steps.check-existing.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SERVICE_NAME: ${{ steps.issue-parser.outputs.issueparser_service_name }}
@@ -51,10 +73,14 @@ jobs:
         with:
           script: |
             const serviceName = "${{ steps.issue-parser.outputs.issueparser_service_name }}";
+            const alreadyExisted = "${{ steps.check-existing.outputs.exists }}" === "true";
+            const body = alreadyExisted
+              ? `Repo already exists: https://github.com/vimsco-devops/${serviceName} (no changes made \u2014 this looked like a retry after a prior success).`
+              : `Your service repo is ready: https://github.com/vimsco-devops/${serviceName}`;
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `Your service repo is ready: https://github.com/vimsco-devops/${serviceName}`
+              body,
             });
 
