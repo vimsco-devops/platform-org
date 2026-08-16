@@ -1,0 +1,31 @@
+name: "New Microservice Request (Java)"
+description: "Bootstrap a new service from the 'New Microservice, Idea to Production' golden path — Java track"
+title: "[New Service]: "
+labels: ["new-service-request", "golden-path:microservice-java"]
+body:
+  - type: input
+    id: service_name
+    attributes:
+      label: Service name
+      description: "Lowercase, hyphenated (e.g. payments-api). This becomes the new repo name."
+      placeholder: "my-service"
+    validations:
+      required: true
+
+  - type: input
+    id: owning_team
+    attributes:
+      label: Owning team
+      description: "GitHub team that will own this repo"
+      placeholder: "checkout-team"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What does this service do?
+      description: "One or two sentences — goes into the new repo's README"
+    validations:
+      required: true
+

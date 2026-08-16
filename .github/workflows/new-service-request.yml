@@ -29,6 +29,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Determine track (Node vs Java)
+        id: track
+        env:
+          IS_JAVA: ${{ contains(github.event.issue.labels.*.name, 'golden-path:microservice-java') }}
+        run: |
+          if [ "$IS_JAVA" = "true" ]; then
+            echo "form-path=.github/ISSUE_TEMPLATE/new-microservice-java.yml" >> "$GITHUB_OUTPUT"
+            echo "template-repo=service-template-java" >> "$GITHUB_OUTPUT"
+          else
+            echo "form-path=.github/ISSUE_TEMPLATE/new-microservice.yml" >> "$GITHUB_OUTPUT"
+            echo "template-repo=service-template" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Parse issue form
         id: issue-parser
         uses: stefanbuck/github-issue-parser@v3
@@ -62,9 +75,10 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SERVICE_NAME: ${{ steps.issue-parser.outputs.issueparser_service_name }}
           DESCRIPTION: ${{ steps.issue-parser.outputs.issueparser_description }}
+          TEMPLATE_REPO: ${{ steps.track.outputs.template-repo }}
         run: |
           gh repo create "vimsco-devops/${SERVICE_NAME}" \
-            --template vimsco-devops/service-template \
+            --template "vimsco-devops/${TEMPLATE_REPO}" \
             --public \
             --description "${DESCRIPTION}"
 
