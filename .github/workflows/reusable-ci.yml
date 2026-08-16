@@ -40,6 +40,11 @@ jobs:
           docker run --rm -v "${{ github.workspace }}:/src" -w /src semgrep/semgrep \
             semgrep scan --config p/ci --error
 
+      - name: Dependency vulnerability scan (OSV-Scanner)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" ghcr.io/google/osv-scanner \
+            -r /src
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ inputs.node-version }}
