@@ -6,6 +6,21 @@ on:
       environment:
         type: string
         required: true
+      working-directory:
+        type: string
+        default: "."
+      acr-name:
+        type: string
+        required: true
+      image-name:
+        type: string
+        required: true
+      container-app-name:
+        type: string
+        required: true
+      resource-group:
+        type: string
+        required: true
 
 jobs:
   deploy:
@@ -15,6 +30,9 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -22,6 +40,24 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Verify login
-        run: az account show
+      - name: Ensure containerapp CLI extension is present
+        run: az extension add --name containerapp --upgrade
+
+      - name: ACR login
+        run: az acr login --name ${{ inputs.acr-name }}
+
+      - name: Build and push image
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          IMAGE="${{ inputs.acr-name }}.azurecr.io/${{ inputs.image-name }}:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ inputs.container-app-name }} \
+            --resource-group ${{ inputs.resource-group }} \
+            --image "$IMAGE"
 
